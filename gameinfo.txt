@@ -1,0 +1,8 @@
+"GameInfo"
+{
+    Game       "TEMPLATE"
+    Title      "My Game"
+    Type       "singleplayer"
+    Version    "0.1"
+    StartMap   "maps/empty.mgs"
+}

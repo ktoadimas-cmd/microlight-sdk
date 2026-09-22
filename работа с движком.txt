@@ -1,0 +1,820 @@
+microlight_sdk/
+│
+├── src/ ← код
+│ ├── main.cpp ← ВСЯ логика игры (ЭТО ТЫ ПЕРЕПИСЫВАЕШЬ)
+│ ├── gl.h ← OpenGL-заголовки
+│ ├── window.h/cpp ← окно, ввод (WASD, мышь)
+│ ├── renderer.h/cpp ← рендер, свет, шейдеры
+│ ├── shader.h/cpp ← загрузка GLSL
+│ ├── texture.h/cpp ← загрузка PNG
+│ │
+│ ├── core/ ← ядро движка
+│ │ ├── camera.h/cpp ← FPS-камера (движение, прыжок)
+│ │ ├── physics.h/cpp ← коллизии (AABB)
+│ │ ├── model.h/cpp ← модели .mlm, .obj
+│ │ ├── mesh.h/cpp ← VAO/VBO (вершины)
+│ │ ├── mlm.h/cpp ← формат .mlm
+│ │ ├── map.h/cpp ← формат .mgs (карты)
+│ │ ├── map_registry.h/cpp ← автопоиск карт
+│ │ ├── skybox.h/cpp ← небо (cubemap)
+│ │ ├── npc.h/cpp ← NPC (ходит, но не летает в SDK)
+│ │ ├── audio.h/cpp ← звук (miniaudio)
+│ │ ├── gameinfo.h/cpp ← gameinfo.txt
+│ │ ├── gamemenu.h/cpp ← gamemenu.txt
+│ │ └── kv.h/cpp ← парсер KV-формата
+│ │
+│ ├── ui/ ← интерфейс
+│ │ ├── ui_renderer.h/cpp ← 2D-рендер (меню, HUD)
+│ │ ├── menu_renderer.h/cpp ← кнопки меню
+│ │ ├── map_select.h/cpp ← выбор карты
+│ │ └── font.h/cpp ← шрифт (TTF)
+│ │
+│ └── scripting/
+│ └── lua_state.h/cpp ← Lua 5.4 (скрипты)
+│
+├── game/ ← ТВОИ АССЕТЫ
+│ ├── gameinfo.txt ← имя игры, стартовая карта
+│ ├── menu/gamemenu.txt ← кнопки меню
+│ ├── maps/.mgs ← карты
+│ ├── textures/.png ← текстуры
+│ ├── sounds/.wav ← звуки
+│ ├── models/.mlm, .obj ← модели
+│ ├── scripts/.lua ← скрипты
+│ └── textures/skybox/ ← небо (день)
+│ └── textures/skybox_night/ ← небо (ночь)
+│
+├── assets/ ← АССЕТЫ ДВИЖКА
+│ ├── consola.ttf ← шрифт
+│ └── menu_bg.png ← фон меню
+│
+├── shaders/ ← GLSL
+│ ├── 3d.vert / 3d.frag ← основной рендер + свет
+│ ├── shadow.vert / shadow.frag ← тени
+│ └── post.vert / post.frag ← VHS-фильтр
+│
+├── third_party/ ← библиотеки
+│ ├── miniaudio/ ← звук
+│ ├── glm/ ← математика
+│ ├── stb/ ← PNG + TTF
+│ ├── tinyobj/ ← .obj
+│ └── lua/ ← Lua
+│
+├── tools/mingw/ ← компилятор
+│
+├── build/ ← сборка (создаётся автоматически)
+│ ├── microlight.exe ← ЗАПУСКАТЬ ЭТО
+│ ├── game/ ← копия из корня
+│ ├── assets/ ← копия из корня
+│ └── shaders/ ← копия из корня
+│
+├── build.ps1 ← сборка
+├── GUIDE.md ← этот файл
+└── NOTES.md ← шпаргалка
+
+text
+
+---
+
+## ЧАСТЬ 3. КАК РАБОТАТЬ — ЦИКЛ
+
+### 1. Правишь файлы
+
+- **Код** — `src/*.cpp`, `src/*.h`
+- **Ассеты** — `game/`, `assets/`, `shaders/`
+- **Карты** — `game/maps/*.mgs`
+
+### 2. Собираешь
+
+```powershell
+cd "C:\Users\дмитрий\Desktop\microlight_sdk"
+.\build.ps1
+Что делает build.ps1:
+
+Компилирует код из src/
+
+Копирует game/, assets/, shaders/ в build/
+
+Создаёт build/microlight.exe
+
+3. Запускаешь
+powershell
+.\build\microlight.exe
+4. Проверяешь
+Меню — работает?
+
+New Game → MapSelect — карты видны?
+
+В игре — ходит, стреляет, NPC двигается?
+
+5. Смотришь лог
+Запуск с логом:
+
+powershell
+.\build\microlight.exe 2>&1 | Tee-Object -FilePath "$env:TEMP\game_log.txt"
+Потом:
+
+powershell
+Select-String -Path "$env:TEMP\game_log.txt" -Pattern "loaded|error|failed|cannot" | Select-Object -First 30
+Ищи:
+
+Texture loaded — текстура загрузилась
+
+Texture load failed — файл не найден
+
+MLM loaded — модель загрузилась
+
+error / failed — проблема
+
+6. Если сломалось — откат
+powershell
+# Найти бэкап
+Get-ChildItem "C:\Users\дмитрий\Desktop\microlight_sdk" -Directory | Where-Object { $_.Name -like "backup_*" } | Sort-Object LastWriteTime -Descending
+powershell
+# Восстановить
+Copy-Item "backup_IMYA\src\main.cpp" "src\main.cpp" -Force
+.\build.ps1
+ЧАСТЬ 4. КАК СДЕЛАТЬ ИГРУ С НУЛЯ
+Шаг 1. Скопировать SDK в новую папку
+powershell
+Copy-Item "C:\Users\дмитрий\Desktop\microlight_sdk" `
+          "C:\Users\дмитрий\Desktop\mygame" `
+          -Recurse
+Шаг 2. Переименовать в игре
+game/gameinfo.txt:
+
+text
+"GameInfo"
+{
+    Game       "MYGAME"
+    Title      "My Horror Game"
+    Type       "singleplayer"
+    Version    "0.1"
+    StartMap   "maps/start.mgs"
+}
+game/menu/gamemenu.txt:
+
+text
+"GameMenu"
+{
+    Background    "assets/menu_bg.png"
+    Title         "MY HORROR"
+    Subtitle      "Press New Game to start"
+    ...
+}
+Шаг 3. Создать первую карту
+game/maps/start.mgs:
+
+text
+"MGS"
+{
+    Name      "Start"
+    SkyColor  "0.05 0.06 0.09"
+    Skybox    "day"
+
+    Spawn { Pos "0 3 0"  Yaw -90 }
+
+    Light { Dir "-0.3 -1 -0.2"  Color "1 1 1"  Ambient "0.2 0.2 0.2" }
+
+    Entities
+    {
+        Brush
+        {
+            Pos     "0 -0.5 0"
+            Size    "50 1 50"
+            Texture "white.png"
+            Tint    "1 1 1 1"
+        }
+    }
+}
+Шаг 4. Переписать main.cpp
+src/main.cpp — вся логика игры. Что там:
+
+Инициализация — окно, GL, UI, меню
+
+Игровой цикл — update, render
+
+Обработка ввода — WASD, мышь, клавиши
+
+Логика игрока — движение, стрельба
+
+Логика NPC — где, что делает
+
+Сохранения — что и куда
+
+В SDK main.cpp — минимальный (только движок). Ты добавляешь игровое.
+
+Шаг 5. Свои ассеты
+Текстуры — game/textures/*.png (256×256, 512×512)
+
+Звуки — game/sounds/*.wav (16-bit, 44.1 кГц)
+
+Модели — game/models/*.mlm или .obj
+
+Шаг 6. Собрать и запустить
+powershell
+cd "C:\Users\дмитрий\Desktop\mygame"
+.\build.ps1
+.\build\microlight.exe
+ЧАСТЬ 5. ЧТО ЗА ЧТО ОТВЕЧАЕТ
+src/ — ЯДРО
+Файл	Отвечает	Меняешь
+main.cpp	Логика игры, игровой цикл	✅ ДА
+gl.h	OpenGL-заголовки	❌ нет
+window.h/cpp	Окно, ввод	❌ нет (только если нужен новый ввод)
+renderer.h/cpp	Рендер, свет, шейдеры	🟡 если новый эффект
+shader.h/cpp	Загрузка GLSL	❌ нет
+texture.h/cpp	Загрузка PNG	❌ нет
+src/core/ — ЯДРО ДВИЖКА
+Файл	Отвечает	Меняешь
+camera.h/cpp	FPS-камера, движение, прыжок	🟡 если хочешь другую физику
+physics.h/cpp	Коллизии (AABB)	🟡 если нужны другие коллизии
+model.h/cpp	Загрузка моделей	❌ нет
+mesh.h/cpp	Вершины, VAO/VBO	❌ нет
+mlm.h/cpp	Формат .mlm	🟡 если новый формат
+map.h/cpp	Формат .mgs	🟡 если новые секции
+map_registry.h/cpp	Автопоиск карт	❌ нет
+skybox.h/cpp	Небо (cubemap)	🟡 если новые скайбоксы
+npc.h/cpp	Логика NPC	✅ ДА (для своего NPC)
+audio.h/cpp	Звук	🟡 если новые методы
+gameinfo.h/cpp	gameinfo.txt	❌ нет
+gamemenu.h/cpp	gamemenu.txt	❌ нет
+kv.h/cpp	Парсер KV	❌ нет
+src/ui/ — ИНТЕРФЕЙС
+Файл	Отвечает	Меняешь
+ui_renderer.h/cpp	2D-рендер (меню, HUD)	🟡 для HUD
+menu_renderer.h/cpp	Кнопки меню	🟡 если новое меню
+map_select.h/cpp	Выбор карты	🟡 если что-то менять
+font.h/cpp	Шрифт	❌ нет
+src/scripting/ — LUA
+Файл	Отвечает	Меняешь
+lua_state.h/cpp	Lua 5.4	🟡 если добавляешь API
+game/ — ТВОИ АССЕТЫ
+Папка	Что	Меняешь
+gameinfo.txt	Имя, стартовая карта	✅ ДА
+menu/gamemenu.txt	Кнопки меню	✅ ДА
+maps/	Карты .mgs	✅ ДА
+textures/	Текстуры .png	✅ ДА
+sounds/	Звуки .wav	✅ ДА
+models/	Модели .mlm/.obj	✅ ДА
+scripts/	Скрипты .lua	✅ ДА
+assets/ — АССЕТЫ ДВИЖКА
+Файл	Что	Меняешь
+consola.ttf	Шрифт	🟡 если другой шрифт
+menu_bg.png	Фон меню	✅ ДА (свой фон)
+shaders/ — GLSL
+Файл	Что	Меняешь
+3d.vert/frag	Основной рендер	🟡 если новый эффект
+shadow.vert/frag	Тени	🟡 если менять тени
+post.vert/frag	VHS	🟡 если убрать/поменять VHS
+ЧАСТЬ 6. API ДВИЖКА
+Renderer — рисование
+cpp
+// Начало кадра
+renderer.BeginFrame(width, height, camera, skyR, skyG, skyB);
+
+// Проход теней
+renderer.BeginShadowPass(lightDir);
+
+// Отрисовка блока
+glm::mat4 m = glm::translate(glm::mat4(1.0f), pos);
+m = glm::scale(m, size);
+renderer.DrawCubeScaled(m, *tex, tint);
+
+// Отрисовка модели
+renderer.DrawModel(model, modelMatrix);
+
+// Конец кадра
+renderer.EndFrame();
+
+// Скайбокс
+skybox.Render(camera.View(), camera.Projection());
+skybox.SetTint(glm::vec3(1,1,1));
+
+// Точечные лампы (до 16)
+std::vector<ml::PointLight> lights;
+ml::PointLight pl;
+pl.pos = {0, 4, 0};
+pl.color = {1, 0.9, 0.6};
+pl.range = 12.0f;
+lights.push_back(pl);
+renderer.SetLights(lights);
+Camera — игрок
+cpp
+// Обработка ввода (WASD, прыжок, приседание)
+camera.ApplyInput(dt, wishDir, jump, crouch);
+
+// Обновление векторов
+camera.UpdateVectors();
+
+// Мышь
+camera.ProcessMouse(dx, dy);
+
+// Позиция
+camera.position = feetPos;
+camera.position.y += camera.eyeHeight;
+Npc — враг
+cpp
+ml::Npc npc;
+npc.Init(glm::vec3(3, 0, 5));
+
+// В цикле:
+npc.Update(dt, feetPos, phys);
+Audio — звук
+cpp
+audio.Init();
+
+// Музыка (loop)
+audio.PlayMusic("game/sounds/theme.wav", 0.5f);
+audio.StopMusic();
+audio.SetMusicVolume(0.3f);
+
+// Гул (loop)
+audio.PlayAmbient("game/sounds/ambient.wav", 0.3f);
+audio.StopAmbient();
+
+// Одноразовый звук
+audio.PlaySoundFile("game/sounds/shot.wav", 1.0f);
+
+audio.Shutdown();
+Map — карты
+cpp
+// Загрузка
+auto m = ml::Map::Load("game/maps/test.mgs");
+if (m) {
+    m->Dump();
+    for (auto& b : m->brushes) {
+        // b.pos, b.size, b.texture, b.tint
+    }
+    for (auto& e : m->models) {
+        // e.file, e.pos, e.scale, e.spin
+    }
+    // m->spawn.pos, m->spawn.yaw
+    // m->light.dir, m->light.color, m->light.ambient
+    // m->skyColor, m->skybox ("day"/"night")
+}
+Model — модели
+cpp
+ml::Model model;
+if (model.LoadMLM("game/models/clown.mlm")) {
+    renderer.DrawModel(model, modelMatrix);
+}
+
+// Или .obj
+model.LoadOBJ("game/models/ak47.obj", "game/models/");
+Physics — коллизии
+cpp
+ml::PhysWorld phys;
+
+// Добавить блок
+ml::AABB box;
+box.min = pos - size * 0.5f;
+box.max = pos + size * 0.5f;
+phys.AddBox(box);
+
+// Двинуть персонажа
+bool onGround = false;
+feetPos = phys.MoveCharacter(feetPos, radius, height, velocity, dt, onGround);
+UIRenderer — 2D
+cpp
+ui.Begin(screenW, screenH);
+
+// Текст
+ui.DrawText(font, "Hello", posPx, scale, color, screenW, screenH);
+
+// Прямоугольник
+ui.DrawRect(pos, size, color);
+
+// Текстура (полный экран = pos(-1,-1), size(2,2))
+ui.DrawTexturedRect(glm::vec2(-1,-1), glm::vec2(2,2), texture, tint);
+
+ui.End();
+⚠️ ВАЖНО: UIRenderer работает в NDC (-1..+1), не в пикселях. Для полного экрана — (-1,-1) и (2,2).
+
+Font — шрифт
+cpp
+ml::Font font;
+font.Load("assets/consola.ttf", 32.0f);
+ЧАСТЬ 7. ФОРМАТЫ ФАЙЛОВ
+.mgs — карта (текст)
+text
+"MGS"
+{
+    Name      "My Map"
+    SkyColor  "0.05 0.06 0.09"      ← цвет фона
+    Skybox    "day"                  ← "day" или "night"
+
+    Spawn
+    {
+        Pos    "0 3 5"              ← где появляется игрок
+        Yaw    -90                   ← куда смотрит
+    }
+
+    Light
+    {
+        Dir     "-0.5 -1.0 -0.3"    ← направление света (солнце)
+        Color   "1.0 0.97 0.9"       ← цвет
+        Ambient "0.25 0.27 0.35"     ← фоновое освещение
+    }
+
+    Entities
+    {
+        Brush
+        {
+            Pos     "0 -0.5 0"      ← центр блока
+            Size    "100 1 100"     ← размер (x, y, z)
+            Texture "test.png"      ← имя файла из game/textures/
+            Tint    "0.6 0.65 0.75 1.0"  ← множитель цвета
+        }
+        Model
+        {
+            File    "sphere.obj"    ← модель из game/models/
+            Pos     "0 2.5 0"       ← позиция
+            Scale   "1.0 1.0 1.0"   ← масштаб
+            Spin    "0.0 0.7 0.4"   ← вращение (рад/сек)
+        }
+    }
+}
+.mlm — модель (текст)
+text
+MLM 1.0
+name sphere
+scale 1.0
+
+vertex px py pz  nx ny nz  u v      ← позиция, нормаль, UV
+vertex 1 0 0  1 0 0  1 0
+face 0 1 2                          ← треугольник из вершин 0, 1, 2
+Разделитель — запятая или пробел. 0,353553 = 0.353553.
+
+save.txt — сохранение
+text
+map 0                       ← индекс карты
+player 0.38 0.0 1.57        ← feetPos
+camera -64.8 -4.9           ← yaw pitch
+npc 2.34 1.66 4.93          ← позиция NPC
+gameinfo.txt
+text
+"GameInfo"
+{
+    Game       "MYGAME"                 ← имя папки
+    Title      "My Horror Game"         ← заголовок окна
+    Type       "singleplayer"
+    Version    "0.1"
+    StartMap   "maps/test.mgs"          ← стартовая карта
+}
+gamemenu.txt
+text
+"GameMenu"
+{
+    Background    "assets/menu_bg.png"
+    Title         "MY GAME"
+    Subtitle      "Press New Game to start"
+
+    ButtonWidth   0.40
+    ButtonHeight  0.08
+    ButtonSpacing 0.11
+
+    Buttons
+    {
+        Button { Label "New Game"  Action "startgame" }
+        Button { Label "Load Game" Action "load" }
+        Button { Label "Quit"      Action "quit" }
+    }
+}
+Action: "startgame", "load", "options", "quit".
+
+ЧАСТЬ 8. ЧАСТЫЕ ЗАДАЧИ
+Добавить новую карту
+Создать game/maps/mymap.mgs (скопировать empty.mgs)
+
+Изменить Name, Spawn, Entities
+
+Запустить игру — карта сама найдётся в MapSelect
+
+Добавить NPC
+В main.cpp:
+
+cpp
+ml::Npc npc;
+npc.Init(glm::vec3(5, 0, 5));
+В цикле:
+
+cpp
+npc.Update(dt, feetPos, phys);
+Отрисовка:
+
+cpp
+glm::mat4 m(1.0f);
+m = glm::translate(m, npc.position + glm::vec3(0, npc.height * 0.5f, 0));
+renderer.DrawCubeScaled(m, *getTexture("npc.png"), glm::vec4(1,1,1,1));
+Своя текстура
+Положить PNG в game/textures/mymonster.png (256×256 или 512×512)
+
+Использовать в карте: Texture "mymonster.png"
+
+Или в коде: auto tex = getTexture("mymonster.png");
+
+Свой звук
+Положить WAV в game/sounds/mysound.wav (16-bit, 44.1 кГц)
+
+audio.PlaySoundFile("game/sounds/mysound.wav", 1.0f);
+
+Своё меню
+Изменить game/menu/gamemenu.txt — кнопки
+
+Изменить assets/menu_bg.png — фон
+
+Пересобрать: .\build.ps1
+
+Своя модель
+Сделать в Blender → экспорт в .obj
+
+Положить в game/models/my.obj
+
+Загрузить: model.LoadOBJ("game/models/my.obj");
+
+Отрисовать: renderer.DrawModel(model, matrix);
+
+Свой свет (точечные лампы)
+В main.cpp перед BeginFrame:
+
+cpp
+std::vector<ml::PointLight> lights;
+ml::PointLight pl;
+pl.pos   = {0, 4, 0};
+pl.color = {1.0, 0.9, 0.6};   // жёлтый
+pl.range = 12.0f;
+lights.push_back(pl);
+renderer.SetLights(lights);
+До 16 ламп одновременно.
+
+Отключить что-то в движке
+Найти в коде и закомментировать:
+
+VHS — EndFrame в renderer.cpp
+
+Тени — BeginShadowPass в main.cpp
+
+Смерть от NPC — блок if (playerDead) в main.cpp
+
+ЧАСТЬ 9. АНТИПАТТЕРНЫ (что НЕЛЬЗЯ)
+❌ $lines.Insert без ArrayList
+powershell
+# ПЛОХО — дублирует файл
+$lines = $lines[0..$i] + $insert + $lines[($i+1)..]
+powershell
+# ПРАВИЛЬНО
+$lines = [System.Collections.ArrayList]::new()
+Get-Content $f | ForEach-Object { [void]$lines.Add($_) }
+$lines.Insert($i, "строка")
+Set-Content -Path $f -Value $lines -Encoding UTF8
+Get-ChildItem $f | Select-Object Name, Length  # ПРОВЕРКА РАЗМЕРА
+❌ Set-Content -Encoding UTF8 для .mgs/.txt
+PowerShell 5 добавляет BOM. Парсер не понимает.
+
+powershell
+# ПРАВИЛЬНО
+[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))
+❌ Забыть build.ps1 после правки ассетов
+build.ps1 копирует game/, assets/, shaders/ в build/. Если не собрать — игра читает старое из build/.
+
+❌ Удалять код без бэкапа
+Всегда бэкап перед правкой:
+
+powershell
+$bk = "backup_$((Get-Date).ToString('yyyy-MM-dd_HH-mm'))"
+New-Item -ItemType Directory -Path $bk | Out-Null
+Copy-Item "src" "$bk\src" -Recurse
+❌ Много правок за раз
+Одна правка → сборка → проверка → следующая.
+
+ЧАСТЬ 10. ОШИБКИ И ИХ РЕШЕНИЕ
+Ошибка	Причина	Решение
+GameInfo: no 'GameInfo' node	BOM в gameinfo.txt	Пересоздать через WriteAllText
+Texture load failed: assets/X	Файла нет в assets/, но есть в game/textures/	Нормально — ищет в двух местах
+MLM: cannot open X	Модели нет	Проверить путь
+[Audio] cannot load X	Звука нет	Проверить путь
+Skybox: cannot load X	Нет cubemap	Создать 6 PNG в skybox/
+expected declaration before '}'	Сломан код — лишний }	Откатить из бэкапа
+was not declared in this scope	Переменная не объявлена	Проверить #include и объявления
+ЧАСТЬ 11. СБОРКА — BUILD.PS1
+Что делает build.ps1:
+
+Компилирует все .cpp из src/ → .o
+
+Линкует → build/microlight.exe
+
+Копирует game/ → build/game/
+
+Копирует assets/ → build/assets/
+
+Копирует shaders/ → build/shaders/
+
+Запускает microlight.exe
+
+Если что-то не так — смотри build.ps1:
+
+powershell
+Get-Content "build.ps1" -Raw
+ЧАСТЬ 12. С ЧЕГО НАЧАТЬ
+Если хочешь новую игру
+Форкни SDK: Copy-Item microlight_sdk mygame -Recurse
+
+Измени game/gameinfo.txt — имя
+
+Измени game/menu/gamemenu.txt — название в меню
+
+Замени assets/menu_bg.png — свой фон
+
+Создай game/maps/start.mgs — первая карта
+
+Запусти: .\build.ps1
+
+Если хочешь новую фичу в движке
+Бэкап
+
+Правь src/
+
+Сборка → проверка
+
+Если работает — новая фича в движке
+
+Если сломалось — откат
+
+Если хочешь модифицировать чужую игру на SDK
+Возьми игру (например, ANDY'S-BOX)
+
+Правь game/ — карты, текстуры, звуки
+
+Правь src/main.cpp — логика
+
+Собери → играй
+
+ЧАСТЬ 13. РЕСУРСЫ
+GitHub движка: (если выложишь)
+
+Пример игры: ANDY'S-BOX — C:\Users\дмитрий\Desktop\Andybox
+
+GameJolt ANDY'S-BOX: https://gamejolt.com/games/andysbox/1100112
+
+Автор: Ritmikstudios
+
+ФИНАЛ
+microlight — инструмент. Ты — разработчик. Игра — твоя.
+
+Не бойся экспериментировать. Не бойся ломать. Бэкап — и вперёд.
+
+Удачи!
+
+Ritmikstudios, 2026
+'@
+
+path = "C:\Users\дмитрий\Desktop\microlight_sdk\GUIDE.md" [System.IO.File]::WriteAllText(path, 
+g
+u
+i
+d
+e
+,
+[
+S
+y
+s
+t
+e
+m
+.
+T
+e
+x
+t
+.
+U
+T
+F
+8
+E
+n
+c
+o
+d
+i
+n
+g
+]
+:
+:
+n
+e
+w
+(
+guide,[System.Text.UTF8Encoding]::new(false))
+
+Write-Host "GUIDE.md создан:"
+Get-ChildItem 
+p
+a
+t
+h
+∣
+S
+e
+l
+e
+c
+t
+−
+O
+b
+j
+e
+c
+t
+N
+a
+m
+e
+,
+L
+e
+n
+g
+t
+h
+W
+r
+i
+t
+e
+−
+H
+o
+s
+t
+"
+"
+W
+r
+i
+t
+e
+−
+H
+o
+s
+t
+"
+Строк
+:
+"
+(
+G
+e
+t
+−
+C
+o
+n
+t
+e
+n
+t
+path∣Select−ObjectName,LengthWrite−Host""Write−Host"Строк:"(Get−Contentpath).Count
+
+text
+
+**Ожидаемо:** `GUIDE.md` **~25–35 КБ**, **~700–900 строк**.
+
+## Что в курсе
+
+**13 частей:**
+
+1. **Что это и зачем** — движок vs игра
+2. **Структура** — что где лежит
+3. **Как работать** — цикл (правишь → собираешь → запускаешь)
+4. **Как сделать игру с нуля** — 6 шагов
+5. **Что за что отвечает** — таблицы по каждой папке
+6. **API движка** — `Renderer`, `Camera`, `Npc`, `Audio`, `Map`, `Model`, `Physics`, `UIRenderer`, `Font`
+7. **Форматы файлов** — `.mgs`, `.mlm`, `save.txt`, `gameinfo.txt`, `gamemenu.txt`
+8. **Частые задачи** — добавить карту, NPC, текстуру, звук, модель, свет
+9. **Антипаттерны** — что **нельзя**
+10. **Ошибки и решение** — таблица
+11. **Сборка** — что делает `build.ps1`
+12. **С чего начать** — 3 сценария
+13. **Ресурсы**
+
+## Кому пригодится
+
+- **Тебе** — через **месяц** забудешь, **открой GUIDE.md**
+- **Следующему ИИ** — **сразу поймёт**, что за что
+- **Моддерам** — если **попросят API**
+- **Тебе через 2 года** — для **DLL-версии** — **всё описано**
+
+## Что дальше
+
+1. **Прогони команду** — скинь вывод
+2. **Сделай бэкап SDK** — с **GUIDE.md**
+3. **Отдыхай** — **ты заслужил**
+
+---
+
+**Спа
